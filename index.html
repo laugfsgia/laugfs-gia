@@ -2920,7 +2920,6 @@ function deleteFollowupEntry(ri,fi,fui){
 function editFollowupEntry(ri,fi,fui){
   const fu=(records[ri].findings[fi].followups||[])[fui];
   if(!canEditFollowup(fu)){alert("You can only edit follow-ups you added, or need manager permission.");return;}
-  const fu=records[ri].findings[fi].followups[fui];
   // Pre-select the finding
   const sel=document.getElementById("fu-finding-sel");
   if(sel){sel.value=fi;onFollowupFindingSelect();}
@@ -3191,26 +3190,62 @@ function editUser(i){
   if(CU.role!=="admin"&&!hasPerm("manage_users")){alert("You don't have permission to manage users.");return;}
   const users=JSON.parse(localStorage.getItem("gia_users")||"[]");
   const u=users[i];
-  const newName=prompt("Full name:",u.name);
-  if(newName===null) return;
-  const newUsername=prompt("Username:",u.username);
-  if(newUsername===null) return;
-  const newPwd=prompt("New password (leave blank to keep current):","");
-  if(newPwd===null) return;
-  const roles2=customRoles.map(r=>r.key);
-  const newRole=prompt("Role ("+roles2.join("/")+"):",u.role);
-  if(newRole===null) return;
-  if(!newName.trim()||!newUsername.trim()){alert("Name and username cannot be empty.");return;}
-  if(newUsername!==u.username && users.find((x,j)=>j!==i&&x.username===newUsername)){alert("Username already taken.");return;}
-  if(newRole && !roles2.includes(newRole)){alert("Invalid role. Choose from: "+roles2.join(", "));return;}
-  users[i].name=newName.trim();
-  users[i].username=newUsername.trim().toLowerCase();
+  // Build inline edit modal
+  const existing=document.getElementById("edit-user-modal");
+  if(existing) existing.remove();
+  const roleOpts=customRoles.map(r=>`<option value="${r.key}"${r.key===u.role?" selected":""}>${r.label||r.key}</option>`).join("");
+  const modal=document.createElement("div");
+  modal.id="edit-user-modal";
+  modal.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9999;display:flex;align-items:center;justify-content:center";
+  modal.innerHTML=`
+    <div style="background:#fff;border-radius:12px;padding:2rem;width:460px;max-width:95vw;box-shadow:0 20px 60px rgba(0,0,0,.3)">
+      <div style="font-size:16px;font-weight:700;color:var(--navy);margin-bottom:1.25rem">Edit User — ${u.name}</div>
+      <div class="form-grid">
+        <div class="form-group fg-full"><label>Full Name</label><input type="text" id="eu-name" value="${u.name}" placeholder="Full name"></div>
+        <div class="form-group fg-full"><label>Username</label><input type="text" id="eu-username" value="${u.username}" placeholder="username"></div>
+        <div class="form-group fg-full"><label>New Password <span style="font-weight:400;color:var(--text3)">(leave blank to keep current)</span></label><input type="password" id="eu-pwd" placeholder="New password"></div>
+        <div class="form-group fg-full"><label>Role</label><select id="eu-role">${roleOpts}</select></div>
+        <div class="form-group fg-full"><label>Status</label>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:4px">
+            <input type="checkbox" id="eu-active" ${u.active!==false?"checked":""} style="width:16px;height:16px">
+            <span id="eu-active-label" style="font-size:13px;font-weight:600;color:${u.active!==false?"var(--green)":"var(--red)"}">${u.active!==false?"Active":"Inactive"}</span>
+          </div>
+        </div>
+      </div>
+      <div id="eu-msg" class="status-msg"></div>
+      <div style="display:flex;gap:.75rem;justify-content:flex-end;margin-top:1.25rem">
+        <button class="btn btn-secondary" onclick="document.getElementById('edit-user-modal').remove()">Cancel</button>
+        <button class="btn btn-primary" onclick="saveEditUser(${i})">Save Changes</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  // Active checkbox label update
+  document.getElementById("eu-active").onchange=function(){
+    const lbl=document.getElementById("eu-active-label");
+    lbl.textContent=this.checked?"Active":"Inactive";
+    lbl.style.color=this.checked?"var(--green)":"var(--red)";
+  };
+}
+function saveEditUser(i){
+  const users=JSON.parse(localStorage.getItem("gia_users")||"[]");
+  const newName=document.getElementById("eu-name").value.trim();
+  const newUsername=document.getElementById("eu-username").value.trim().toLowerCase();
+  const newPwd=document.getElementById("eu-pwd").value;
+  const newRole=document.getElementById("eu-role").value;
+  const newActive=document.getElementById("eu-active").checked;
+  if(!newName||!newUsername){showMsg("eu-msg","error","Name and username cannot be empty.");return;}
+  if(newUsername!==users[i].username && users.find((x,j)=>j!==i&&x.username===newUsername)){
+    showMsg("eu-msg","error","Username already taken.");return;
+  }
+  users[i].name=newName;
+  users[i].username=newUsername;
+  users[i].role=newRole;
+  users[i].active=newActive;
   if(newPwd.trim()) users[i].password=newPwd.trim();
-  if(newRole.trim()) users[i].role=newRole.trim();
-  // Toggle active via Activate/Deactivate button — editUser only handles name/username/pwd/role
   localStorage.setItem("gia_users",JSON.stringify(users));
-  logAction(`Edited user: ${u.name}`);
+  logAction(`Edited user: ${newName} → role: ${newRole}, active: ${newActive}`);
   pushConfigToFirebase();
+  document.getElementById("edit-user-modal").remove();
   showMsg("user-msg","success","User updated.");
   renderAdmin();
 }
