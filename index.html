@@ -2545,7 +2545,6 @@ function switchModalTab(id,el){
 function saveEdit(){
   const r=records[editingIdx];
   if(!canEditAudit(r)){showMsg("modal-msg","error","You can only edit audits you created, or need manager permission.");return;}
-  const r=records[editingIdx];
   const mg=id=>document.getElementById(id)?.value||"";
   r.pillar=mg("m-pillar"); r.subseg=mg("m-subseg"); r.company=mg("m-company");
   r.fy=mg("m-fy"); r.status=mg("m-status"); r.reviewer=mg("m-reviewer"); r.reviewer2=mg("m-reviewer2");
